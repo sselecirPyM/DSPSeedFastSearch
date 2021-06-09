@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DSPSeedFastSearch": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

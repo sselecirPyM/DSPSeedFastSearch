@@ -47,6 +47,7 @@
         <StackPanel Grid.Column="1" Grid.Row="1">
             <Button Content="查看单个/View Single" Height="50" x:Name="ViewButton" Click="ViewButton_Click"/>
             <Button Content="基准测试/Bench Mark" Height="50" x:Name="benchmarkButton" Click="BenchMarkButton_Click"/>
+            <Button Content="GPU基准测试/GPU Bench Mark" Height="50" x:Name="gpuBenchmarkButton" Click="GPUBenchMarkButton_Click"/>
             <TextBlock x:Name="message"/>
         </StackPanel>
         <DataGrid x:Name="viewSeeds" CanUserAddRows="False" Grid.Row="1"/>
