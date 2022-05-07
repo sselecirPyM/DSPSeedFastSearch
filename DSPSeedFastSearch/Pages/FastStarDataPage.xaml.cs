@@ -97,7 +97,7 @@ namespace DSPSeedFastSearch.Pages
 
         private void GPUBenchMarkButton_Click(object sender, RoutedEventArgs e)
         {
-            var compileResult = DxcCompiler.Compile(DxcShaderStage.Compute, File.ReadAllText("Data/Shaders/FastStarData.hlsl"), "main");
+            var compileResult = DxcCompiler.Compile(DxcShaderStage.Compute, File.ReadAllText("Data/Shaders/FastStarData.hlsl"), "main",null, "Data/Shaders/FastStarData.hlsl");
             if (compileResult.GetStatus() != SharpGen.Runtime.Result.Ok)
             {
                 MessageBox.Show(compileResult.GetErrors());
@@ -111,11 +111,8 @@ namespace DSPSeedFastSearch.Pages
             RWBuffer rwBuffer = new RWBuffer();
             ReadBackBuffer readBackBuffer = new ReadBackBuffer();
             RingUploadBuffer uploadBuffer = new RingUploadBuffer();
-            int testBufferSize = 65536 * 128;
+            int testBufferSize = 65536 * 512;
             int errorCount = 0;
-            int big = 0;
-            int small = 0;
-            int bigError = 0;
             System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
             string time = "";
             string CPUTime = "";
@@ -132,7 +129,7 @@ namespace DSPSeedFastSearch.Pages
                 commandList.SetDescriptorHeapDefault();
                 commandList.SetComputeRootSignature(rootSignature);
                 commandList.SetComputeShader(computeShader);
-                int batchCount = 64;
+                int batchCount = 4;
                 int sizePerBatch = testBufferSize / batchCount / sizeof(int);
                 for (int i = 0; i < batchCount; i++)
                 {
@@ -151,29 +148,11 @@ namespace DSPSeedFastSearch.Pages
                 stopwatch.Stop();
                 time = stopwatch.ElapsedMilliseconds.ToString();
                 stopwatch.Restart();
-                //for (int i = 0; i < testData1.Length; i++)
-                //{
-                //    Algorithms.URandom1 random1 = new Algorithms.URandom1(i);
-                //    for (int j = 0; j < 5; j++)
-                //    {
-                //        random1.Next();
-                //    }
-                //    int testData2 = random1.Next();
-                //    int viewResult = testData1[i];
-                //    if (viewResult != testData2)
-                //    {
-                //        if (viewResult > testData2)
-                //            big++;
-                //        if (viewResult < testData2)
-                //            small++;
-                //        if (Math.Abs(viewResult - testData2) > 1)
-                //            bigError++;
-                //        errorCount++;
-                //    }
-                //}
+
                 Parallel.For(0, testData1.Length, (int i) =>
                   {
-                      Algorithms.URandom1 random1 = new Algorithms.URandom1(i);
+                      Algorithms.XURandom1 random1 = new Algorithms.XURandom1(i, stackalloc int[56]);
+                      //Algorithms.URandom1 random1 = new Algorithms.URandom1(i);
                       for (int j = 0; j < 5; j++)
                       {
                           random1.Next();
@@ -182,12 +161,6 @@ namespace DSPSeedFastSearch.Pages
                       int viewResult = testData1[i];
                       if (viewResult != testData2)
                       {
-                          if (viewResult > testData2)
-                              Interlocked.Increment(ref big);
-                          if (viewResult < testData2)
-                              Interlocked.Increment(ref small);
-                          if (Math.Abs(viewResult - testData2) > 1)
-                              Interlocked.Increment(ref bigError);
                           Interlocked.Increment(ref errorCount);
                       }
                   });
@@ -211,7 +184,7 @@ namespace DSPSeedFastSearch.Pages
             }
 
             //message.Text = string.Format("benchmark result:\n{0} star,cost {1}ms",mStarCount, time);
-            message.Text = string.Format("benchmark result:\n{0} random,\ncost {1}ms,\nCPU cost {2}ms, {3} error,\n{4} big, {5} small", testBufferSize / sizeof(int), time, CPUTime, errorCount, big, small);
+            message.Text = string.Format("benchmark result:\n{0} random,\ncost {1}ms,\nCPU cost {2}ms, {3} error,", testBufferSize / sizeof(int), time, CPUTime, errorCount);
         }
 
         private void ViewButton_Click(object sender, RoutedEventArgs e)

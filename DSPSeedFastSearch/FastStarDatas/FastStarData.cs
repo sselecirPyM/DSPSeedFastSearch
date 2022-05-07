@@ -19,7 +19,7 @@ namespace DSPSeedFastSearch.FastStarDatas
         {
             this.seed = galaxySeed;
             stars = new Star[starCount];
-            URandom1 random = new URandom1(galaxySeed);
+            XURandom1 random = new XURandom1(galaxySeed, stackalloc int[56]);
             int seed = random.Next();
 
             int num6 = Mathf.CeilToInt(0.01f * (float)starCount + (float)random.NextDouble() * 0.3f);
@@ -81,10 +81,10 @@ namespace DSPSeedFastSearch.FastStarDatas
 
 
             starData.seed = seed;
-            URandom1 random = new URandom1(seed);
+            XURandom1 random = new XURandom1(seed, stackalloc int[56]);
             int seed2 = random.Next();
             int seed3 = random.Next();
-            URandom1 random2 = new URandom1(seed3);
+            XURandom1 random2 = new XURandom1(seed3, stackalloc int[56]);
             double num3 = random2.NextDouble();
             double num4 = random2.NextDouble();
             double num5 = random2.NextDouble();
@@ -240,11 +240,11 @@ namespace DSPSeedFastSearch.FastStarDatas
 #endif
             star.level = 0f;
             star.seed = seed;
-            URandom1 random = new URandom1(seed);
+            XURandom1 random = new XURandom1(seed, stackalloc int[56]);
             int seed2 = random.Next();
             int seed3 = random.Next();
 
-            URandom1 random2 = new URandom1(seed3);
+            XURandom1 random2 = new XURandom1(seed3, stackalloc int[56]);
             double r = random2.NextDouble();
             double r2 = random2.NextDouble();
             double num = random2.NextDouble();
@@ -371,7 +371,7 @@ namespace DSPSeedFastSearch.FastStarDatas
         {
             this.seed = galaxySeed;
             stars = new Star[starCount];
-            URandom1 random = new URandom1(galaxySeed);
+            XURandom1 random = new XURandom1(galaxySeed,stackalloc int[56]);
             int seed = random.Next();
 
             int num6 = Mathf.CeilToInt(0.01f * (float)starCount + (float)random.NextDouble() * 0.3f);
@@ -383,10 +383,11 @@ namespace DSPSeedFastSearch.FastStarDatas
             int num12 = num11 - num8;
             int num13 = (num12 - 1) / num9;
             int num14 = num13 / 2;
+            Span<int> tempMemory1 = stackalloc int[56];
             for (int i = 0; i < starCount; i++)
             {
                 int seed2 = random.Next();
-                URandom1 randomX = new URandom1(seed2);
+                XURandom1 randomX = new XURandom1(seed2, tempMemory1);
                 int notuse1 = randomX.Next();
                 int seed3 = randomX.Next();
                 if (i == 0)
@@ -421,12 +422,12 @@ namespace DSPSeedFastSearch.FastStarDatas
                     {
                         starType = EStarType.WhiteDwarf;
                     }
-                    stars[i] = CreateStar(starCount, i + 1, seed2, starType, needSpectr,seed3);
+                    stars[i] = CreateStar(starCount, i + 1, seed2, starType, needSpectr, seed3);
                 }
             }
         }
 
-        private static Star CreateStar(int starCount, int id, int seed, EStarType starType, ESpectrType starSpectr,int seed3)
+        private static Star CreateStar(int starCount, int id, int seed, EStarType starType, ESpectrType starSpectr, int seed3)
         {
             Star starData = new Star();
 #if USE_STAR_INDEX
@@ -436,7 +437,7 @@ namespace DSPSeedFastSearch.FastStarDatas
 
 
             starData.seed = seed;
-            URandom1 random2 = new URandom1(seed3);
+            XURandom1 random2 = new XURandom1(seed3, stackalloc int[56]);
             double num3 = random2.NextDouble();
             double num4 = random2.NextDouble();
             double num5 = random2.NextDouble();
@@ -593,7 +594,7 @@ namespace DSPSeedFastSearch.FastStarDatas
             star.level = 0f;
             star.seed = seed;
 
-            URandom1 random2 = new URandom1(seed3);
+            XURandom1 random2 = new XURandom1(seed3,stackalloc int[56]);
             double r = random2.NextDouble();
             double r2 = random2.NextDouble();
             double num = random2.NextDouble();
@@ -631,7 +632,7 @@ namespace DSPSeedFastSearch.FastStarDatas
             star.classFactor = (float)num6;
 #endif
             star.luminosity = Mathf.Pow(num5, 0.7f);
-            star.radius = (float)(Math.Pow((double)star.mass, 0.4) * num3);
+            star.radius = (float)(Mathf.Pow(star.mass, 0.4f) * num3);
             float p = (float)num6 + 2f;
             star.orbitScaler = Mathf.Pow(1.35f, p);
             if (star.orbitScaler < 1f)
@@ -640,9 +641,9 @@ namespace DSPSeedFastSearch.FastStarDatas
             }
             SetStarAge(ref star, star.age, rn, rt);
             star.dysonRadius = star.orbitScaler * 0.28f;
-            if ((double)star.dysonRadius * 40000.0 < (double)(star.physicsRadius * 1.5f))
+            if (star.dysonRadius * 40000.0f < (star.physicsRadius * 1.5f))
             {
-                star.dysonRadius = (float)((double)(star.physicsRadius * 1.5f) / 40000.0);
+                star.dysonRadius = ((star.physicsRadius * 1.5f) / 40000.0f);
             }
             return star;
         }
