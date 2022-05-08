@@ -19,6 +19,8 @@ using System.Text.Unicode;
 using DSPSeedFastSearch.GPUAccelerate;
 using Vortice.Dxc;
 using System.Runtime.InteropServices;
+using DSPSeedFastSearch.GPUCompute;
+using System.Linq;
 
 namespace DSPSeedFastSearch.Pages
 {
@@ -36,10 +38,14 @@ namespace DSPSeedFastSearch.Pages
                 benchmarkButton,
                 gpuBenchmarkButton,
             };
+            computeContext = new ComputeContext();
+            computeContext.Init();
         }
         public int mSeedMin { get; set; } = 0;
         public int mSeedMax { get; set; } = 1000000;
         public int mStarCount { get; set; } = 64;
+
+        public ComputeContext computeContext;
 
         Task currentTask;
         CancellationTokenSource cancellationTokenSource;
@@ -88,78 +94,68 @@ namespace DSPSeedFastSearch.Pages
             }
             stopWatch.Stop();
             long cost1 = stopWatch.ElapsedMilliseconds;
+
             stopWatch.Restart();
             Parallel.For(0, bufferSize, (int i) => result[i] = new FastStarData(i, mStarCount));
             stopWatch.Stop();
             long cost2 = stopWatch.ElapsedMilliseconds;
-            message.Text = string.Format("benchmark result:\n{2} star,{3} seeds,\nsingle core {0}ms,\nmulti core {1}ms,", cost1, cost2, mStarCount, bufferSize);
+
+            FastStarDataSuitForGPU[] result1 = new FastStarDataSuitForGPU[bufferSize];
+            stopWatch.Restart();
+            Parallel.For(0, bufferSize, (int i) => result1[i] = new FastStarDataSuitForGPU(i, mStarCount));
+            stopWatch.Stop();
+            long cost3 = stopWatch.ElapsedMilliseconds;
+
+
+            message.Text = string.Format("benchmark result:\n{2} star,{3} seeds,\nsingle core {0}ms,\nmulti core {1}ms, float {4}ms", cost1, cost2, mStarCount, bufferSize, cost3);
         }
 
         private void GPUBenchMarkButton_Click(object sender, RoutedEventArgs e)
         {
-            var compileResult = DxcCompiler.Compile(DxcShaderStage.Compute, File.ReadAllText("Data/Shaders/FastStarData.hlsl"), "main",null, "Data/Shaders/FastStarData.hlsl");
+            var compileResult = DxcCompiler.Compile(DxcShaderStage.Compute, File.ReadAllText("Data/Shaders/FastStarData.hlsl"), "main", null, "Data/Shaders/FastStarData.hlsl");
             if (compileResult.GetStatus() != SharpGen.Runtime.Result.Ok)
             {
                 MessageBox.Show(compileResult.GetErrors());
                 return;
             }
-            ComputeDevice device = new ComputeDevice();
-            CommandList commandList = new CommandList();
             ComputeShader computeShader = new ComputeShader();
             computeShader.byteCode = compileResult.GetResult().ToArray();
-            RootSignature rootSignature = new RootSignature();
-            RWBuffer rwBuffer = new RWBuffer();
-            ReadBackBuffer readBackBuffer = new ReadBackBuffer();
-            RingUploadBuffer uploadBuffer = new RingUploadBuffer();
-            int testBufferSize = 65536 * 512;
+
+
+            int testBufferSize = 65536 * 8;
             int errorCount = 0;
             System.Diagnostics.Stopwatch stopwatch = System.Diagnostics.Stopwatch.StartNew();
             string time = "";
             string CPUTime = "";
             try
             {
-                device.Init();
-                commandList.Init(device);
-                device.CreateRootSignature(rootSignature, new[] { RootSignatureParamP.CBV, RootSignatureParamP.UAV, });
-                device.CreateRWBuffer(rwBuffer, testBufferSize);
-                device.CreateReadBackBuffer(readBackBuffer, testBufferSize);
-                uploadBuffer.Initialize(device, 65536);
+                computeContext.Begin();
 
-                commandList.BeginCommand();
-                commandList.SetDescriptorHeapDefault();
-                commandList.SetComputeRootSignature(rootSignature);
-                commandList.SetComputeShader(computeShader);
+                computeContext.commandList.SetComputeShader(computeShader);
                 int batchCount = 4;
                 int sizePerBatch = testBufferSize / batchCount / sizeof(int);
+
                 for (int i = 0; i < batchCount; i++)
                 {
-                    int offset = uploadBuffer.Upload<int>(new int[] { i * sizePerBatch, i * sizePerBatch });
-                    commandList.SetComputeUAV(rwBuffer, 0, 0);
-                    uploadBuffer.SetComputeCBV(commandList, offset, 0);
-                    commandList.Dispatch(sizePerBatch / 16, 1, 1);
+                    computeContext.Upload<int>(new int[] { i * sizePerBatch, i * sizePerBatch }, 0);
+                    computeContext.commandList.SetComputeUAV(computeContext.rwBuffer, 0, 0);
+                    computeContext.commandList.Dispatch(sizePerBatch / 16, 1, 1);
                 }
-                commandList.Copy(rwBuffer, readBackBuffer);
-                commandList.EndCommand();
-                commandList.Execute();
-                device.WaitForGpu();
-                int[] testData1 = new int[testBufferSize / sizeof(int)];
 
-                readBackBuffer.CopyTo(MemoryMarshal.Cast<int, byte>(testData1));
+                computeContext.End();
+                float[] testData1 = new float[testBufferSize / sizeof(float)];
+                computeContext.GetResult<float>(testData1);
+
                 stopwatch.Stop();
                 time = stopwatch.ElapsedMilliseconds.ToString();
                 stopwatch.Restart();
 
                 Parallel.For(0, testData1.Length, (int i) =>
                   {
-                      Algorithms.XURandom1 random1 = new Algorithms.XURandom1(i, stackalloc int[56]);
-                      //Algorithms.URandom1 random1 = new Algorithms.URandom1(i);
-                      for (int j = 0; j < 5; j++)
-                      {
-                          random1.Next();
-                      }
-                      int testData2 = random1.Next();
-                      int viewResult = testData1[i];
-                      if (viewResult != testData2)
+                      var star = new FastStarData(i, mStarCount);
+                      var testData2 = star.stars.Max(u => u.luminosity);
+                      float viewResult = testData1[i];
+                      if (Math.Abs(viewResult - testData2) > 0.0001f)
                       {
                           Interlocked.Increment(ref errorCount);
                       }
@@ -172,18 +168,7 @@ namespace DSPSeedFastSearch.Pages
             {
                 MessageBox.Show(exception.ToString());
             }
-            finally
-            {
-                device.Dispose();
-                rootSignature.Dispose();
-                computeShader.Dispose();
-                commandList.Dispose();
-                rwBuffer.Dispose();
-                uploadBuffer.Dispose();
-                readBackBuffer.Dispose();
-            }
 
-            //message.Text = string.Format("benchmark result:\n{0} star,cost {1}ms",mStarCount, time);
             message.Text = string.Format("benchmark result:\n{0} random,\ncost {1}ms,\nCPU cost {2}ms, {3} error,", testBufferSize / sizeof(int), time, CPUTime, errorCount);
         }
 

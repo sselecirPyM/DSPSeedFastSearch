@@ -12,7 +12,7 @@ namespace DSPSeedFastSearch.GPUAccelerate
             IntPtr ptr = resource.Map(0);
             unsafe
             {
-                new Span<byte>(ptr.ToPointer(), size).CopyTo(destination);
+                new Span<byte>(ptr.ToPointer(),Math.Min( size,destination.Length)).CopyTo(destination);
             }
             resource.Unmap(0);
         }

@@ -117,7 +117,7 @@ double RandomNextDouble(inout URandom random)
 {
 	return RandomSample(random);
 }
-double RandomNextFloat(inout URandom random)
+float RandomNextFloat(inout URandom random)
 {
 	return RandomSampleFloat(random);
 }
